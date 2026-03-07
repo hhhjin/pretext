@@ -51,3 +51,7 @@ Internal notes for contributors and agents. Use `README.md` as the public source
 - TweetDeck-style 3 columns of the same text scrolling at the same time
 - Resize Old Man and the Sea
 - Creative responsive magazine-like layout contouring some shapes
+- Decide whether automatic hyphenation / soft-hyphen support is in scope for this repo
+- Decide whether intrinsic sizing / logical width APIs are needed beyond fixed-width height prediction
+- Decide whether bidi rendering strategy work (selection / copy-paste preserving runs) belongs here or stays out of scope
+- Decide whether richer text-engine features like ellipsis, per-character offsets, custom selection, vertical text, or shape wrapping should remain explicitly out of scope
