@@ -23,61 +23,365 @@ type RectBox = {
   height: number
 }
 
-type StageMetrics = {
+type BaseLayout = {
+  viewportHeight: number
   width: number
-  stageTop: number
+  wide: boolean
   bodyLeft: number
   bodyRight: number
+  issueX: number
+  issueY: number
+  issueWidth: number
+  titleX: number
+  titleY: number
+  titleWidth: number
+  centerX: number
+  centerWidth: number
+  rightX: number
+  rightWidth: number
+  leftX: number
+  leftWidth: number
+  bottomX: number
+  bottomWidth: number
+  footerWidth: number
+  statusWidth: number
   ribbonBox: RectBox
   blobBox: RectBox
+}
+
+type MeasuredHeights = {
+  issue: number
+  title: number
+  center: number
+  right: number
+  left: number
+  bottom: number
+  footer: number
+  status: number
+}
+
+type LayoutMetrics = {
+  width: number
+  wide: boolean
+  bodyLeft: number
+  bodyRight: number
+  height: number
+  stageTop: number
+  issueBox: RectBox
   titleBox: RectBox
   centerBox: RectBox
   rightBox: RectBox
   leftBox: RectBox
   bottomBox: RectBox
+  footerBox: RectBox
+  statusBox: RectBox
+  ribbonBox: RectBox
+  blobBox: RectBox
+}
+
+type PositionedLine = {
+  left: number
+  top: number
+  text: string
+  title: string
 }
 
 const prepared: PreparedTextWithSegments = prepareWithSegments(BODY_COPY, FONT)
 
-const spread = document.getElementById('spread') as HTMLDivElement
-const titleBlock = document.getElementById('title-block') as HTMLDivElement
-const deckCenter = document.getElementById('deck-center') as HTMLParagraphElement
-const deckRight = document.getElementById('deck-right') as HTMLParagraphElement
-const deckLeft = document.getElementById('deck-left') as HTMLParagraphElement
-const deckBottom = document.getElementById('deck-bottom') as HTMLParagraphElement
-const ribbonArt = document.getElementById('ribbon-art') as HTMLDivElement
-const blobArt = document.getElementById('blob-art') as HTMLDivElement
-const lineStage = document.getElementById('line-stage') as HTMLDivElement
-const statusMeta = document.getElementById('status-meta')!
+const domCache = {
+  poster: document.getElementById('poster') as HTMLDivElement,
+  issueTag: document.getElementById('issue-tag') as HTMLDivElement,
+  titleBlock: document.getElementById('title-block') as HTMLDivElement,
+  deckCenter: document.getElementById('deck-center') as HTMLParagraphElement,
+  deckRight: document.getElementById('deck-right') as HTMLParagraphElement,
+  deckLeft: document.getElementById('deck-left') as HTMLParagraphElement,
+  deckBottom: document.getElementById('deck-bottom') as HTMLParagraphElement,
+  footerNote: document.getElementById('footer-note') as HTMLDivElement,
+  status: document.getElementById('status') as HTMLDivElement,
+  statusMeta: document.getElementById('status-meta') as HTMLDivElement,
+  ribbonArt: document.getElementById('ribbon-art') as HTMLDivElement,
+  blobArt: document.getElementById('blob-art') as HTMLDivElement,
+  lineStage: document.getElementById('line-stage') as HTMLDivElement,
+  lineNodes: [] as HTMLDivElement[],
+}
 
-let lineElements: HTMLDivElement[] = []
+let scheduledRender = false
+
+function scheduleRender(): void {
+  if (scheduledRender) return
+  scheduledRender = true
+  requestAnimationFrame(function renderChronicle() {
+    scheduledRender = false
+    render()
+  })
+}
+
+window.addEventListener('resize', () => scheduleRender())
+if ('fonts' in document) {
+  void document.fonts.ready.then(() => scheduleRender())
+}
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
 }
 
-function setBox(el: HTMLElement, box: RectBox): RectBox {
-  el.style.left = `${box.x}px`
-  el.style.top = `${box.y}px`
-  el.style.width = `${box.width}px`
-  const height = Math.ceil(el.getBoundingClientRect().height)
-  el.style.height = 'auto'
-  return { ...box, height }
+function setRect(node: HTMLElement, box: RectBox): void {
+  node.style.left = `${box.x}px`
+  node.style.top = `${box.y}px`
+  node.style.width = `${box.width}px`
 }
 
-function lineOverlaps(box: RectBox, lineTop: number): boolean {
-  return lineTop + LINE_HEIGHT > box.y && lineTop < box.y + box.height
+function measureHeight(node: HTMLElement): number {
+  return Math.ceil(node.getBoundingClientRect().height)
 }
 
-function subtractIntervals(rangeLeft: number, rangeRight: number, intervals: Array<{ left: number, right: number }>): Array<{ left: number, right: number }> {
+function applyMeasureProjection(base: BaseLayout): void {
+  domCache.poster.style.width = `${base.width}px`
+
+  setRect(domCache.issueTag, {
+    x: base.issueX,
+    y: base.issueY,
+    width: base.issueWidth,
+    height: 0,
+  })
+  setRect(domCache.titleBlock, {
+    x: base.titleX,
+    y: base.titleY,
+    width: base.titleWidth,
+    height: 0,
+  })
+  setRect(domCache.deckCenter, {
+    x: base.centerX,
+    y: base.wide ? 126 : 0,
+    width: base.centerWidth,
+    height: 0,
+  })
+  setRect(domCache.deckRight, {
+    x: base.rightX,
+    y: base.wide ? 124 : 0,
+    width: base.rightWidth,
+    height: 0,
+  })
+  setRect(domCache.deckLeft, {
+    x: base.leftX,
+    y: base.wide ? 356 : 0,
+    width: base.leftWidth,
+    height: 0,
+  })
+  setRect(domCache.deckBottom, {
+    x: base.bottomX,
+    y: base.wide ? 716 : 0,
+    width: base.bottomWidth,
+    height: 0,
+  })
+  setRect(domCache.footerNote, {
+    x: base.bodyLeft,
+    y: base.wide ? 760 : 0,
+    width: base.footerWidth,
+    height: 0,
+  })
+  setRect(domCache.status, {
+    x: base.wide ? 28 : 20,
+    y: base.viewportHeight - 120,
+    width: base.statusWidth,
+    height: 0,
+  })
+}
+
+function readHeights(): MeasuredHeights {
+  return {
+    issue: measureHeight(domCache.issueTag),
+    title: measureHeight(domCache.titleBlock),
+    center: measureHeight(domCache.deckCenter),
+    right: measureHeight(domCache.deckRight),
+    left: measureHeight(domCache.deckLeft),
+    bottom: measureHeight(domCache.deckBottom),
+    footer: measureHeight(domCache.footerNote),
+    status: measureHeight(domCache.status),
+  }
+}
+
+function computeBaseLayout(viewportWidth: number, viewportHeight: number): BaseLayout {
+  const width = Math.max(320, Math.min(1380, viewportWidth - 28))
+  const wide = width >= 980
+  const bodyLeft = wide ? 56 : 28
+  const bodyRight = width - (wide ? 58 : 28)
+
+  return {
+    viewportHeight,
+    width,
+    wide,
+    bodyLeft,
+    bodyRight,
+    issueX: bodyLeft,
+    issueY: wide ? 28 : 22,
+    issueWidth: wide ? 296 : width - bodyLeft * 2,
+    titleX: bodyLeft,
+    titleY: wide ? 74 : 68,
+    titleWidth: wide ? Math.min(650, width * 0.47) : width - bodyLeft * 2,
+    centerX: wide ? Math.round(width * 0.53) : bodyLeft,
+    centerWidth: wide ? Math.min(290, width * 0.2) : width - bodyLeft * 2,
+    rightX: wide ? width - 248 : bodyLeft,
+    rightWidth: wide ? 182 : width - bodyLeft * 2,
+    leftX: bodyLeft,
+    leftWidth: wide ? 286 : width - bodyLeft * 2,
+    bottomX: wide ? Math.round(width * 0.54) : bodyLeft,
+    bottomWidth: wide ? 344 : width - bodyLeft * 2,
+    footerWidth: wide ? 304 : width - bodyLeft * 2,
+    statusWidth: wide ? width - 56 : width - 40,
+    ribbonBox: wide
+      ? { x: Math.round(width * 0.41), y: 18, width: Math.min(470, width * 0.42), height: 710 }
+      : { x: Math.round(width * 0.17), y: 0, width: Math.round(width * 0.68), height: 330 },
+    blobBox: wide
+      ? { x: 58, y: 540, width: 328, height: 208 }
+      : { x: bodyLeft, y: 0, width: Math.round(width * 0.42), height: 150 },
+  }
+}
+
+function computeLayout(base: BaseLayout, measured: MeasuredHeights): LayoutMetrics {
+  const issueBox = {
+    x: base.issueX,
+    y: base.issueY,
+    width: base.issueWidth,
+    height: measured.issue,
+  }
+
+  if (base.wide) {
+    const titleBox = {
+      x: base.titleX,
+      y: base.titleY,
+      width: base.titleWidth,
+      height: measured.title,
+    }
+    const centerBox = {
+      x: base.centerX,
+      y: 126,
+      width: base.centerWidth,
+      height: measured.center,
+    }
+    const rightBox = {
+      x: base.rightX,
+      y: 124,
+      width: base.rightWidth,
+      height: measured.right,
+    }
+    const leftBox = {
+      x: base.leftX,
+      y: 356,
+      width: base.leftWidth,
+      height: measured.left,
+    }
+    const bottomBox = {
+      x: base.bottomX,
+      y: 716,
+      width: base.bottomWidth,
+      height: measured.bottom,
+    }
+    const footerBox = {
+      x: base.bodyLeft,
+      y: Math.max(base.blobBox.y + base.blobBox.height + 12, leftBox.y + leftBox.height + 28),
+      width: base.footerWidth,
+      height: measured.footer,
+    }
+
+    return {
+      width: base.width,
+      wide: true,
+      bodyLeft: base.bodyLeft,
+      bodyRight: base.bodyRight,
+      height: 0,
+      stageTop: 102,
+      issueBox,
+      titleBox,
+      centerBox,
+      rightBox,
+      leftBox,
+      bottomBox,
+      footerBox,
+      statusBox: { x: 28, y: 0, width: base.statusWidth, height: measured.status },
+      ribbonBox: base.ribbonBox,
+      blobBox: base.blobBox,
+    }
+  }
+
+  const titleBox = {
+    x: base.titleX,
+    y: issueBox.y + issueBox.height + 26,
+    width: base.titleWidth,
+    height: measured.title,
+  }
+  const centerBox = {
+    x: base.centerX,
+    y: titleBox.y + titleBox.height + 28,
+    width: base.centerWidth,
+    height: measured.center,
+  }
+  const rightBox = {
+    x: base.rightX,
+    y: centerBox.y + centerBox.height + 18,
+    width: base.rightWidth,
+    height: measured.right,
+  }
+  const ribbonBox = {
+    ...base.ribbonBox,
+    y: rightBox.y + rightBox.height + 36,
+  }
+  const leftBox = {
+    x: base.leftX,
+    y: ribbonBox.y + ribbonBox.height + 34,
+    width: base.leftWidth,
+    height: measured.left,
+  }
+  const blobBox = {
+    ...base.blobBox,
+    y: leftBox.y + leftBox.height + 30,
+  }
+  const bottomBox = {
+    x: base.bottomX,
+    y: blobBox.y + blobBox.height + 26,
+    width: base.bottomWidth,
+    height: measured.bottom,
+  }
+  const footerBox = {
+    x: base.bodyLeft,
+    y: bottomBox.y + bottomBox.height + 22,
+    width: base.footerWidth,
+    height: measured.footer,
+  }
+
+  return {
+    width: base.width,
+    wide: false,
+    bodyLeft: base.bodyLeft,
+    bodyRight: base.bodyRight,
+    height: 0,
+    stageTop: footerBox.y + footerBox.height + 42,
+    issueBox,
+    titleBox,
+    centerBox,
+    rightBox,
+    leftBox,
+    bottomBox,
+    footerBox,
+    statusBox: { x: 20, y: 0, width: base.statusWidth, height: measured.status },
+    ribbonBox,
+    blobBox,
+  }
+}
+
+function subtractIntervals(
+  rangeLeft: number,
+  rangeRight: number,
+  intervals: Array<{ left: number, right: number }>,
+): Array<{ left: number, right: number }> {
   if (intervals.length === 0) return [{ left: rangeLeft, right: rangeRight }]
 
   const sorted = intervals
-    .map(interval => ({
+    .map((interval) => ({
       left: clamp(interval.left, rangeLeft, rangeRight),
       right: clamp(interval.right, rangeLeft, rangeRight),
     }))
-    .filter(interval => interval.right - interval.left > 0)
+    .filter((interval) => interval.right - interval.left > 0)
     .sort((a, b) => a.left - b.left)
 
   const merged: Array<{ left: number, right: number }> = []
@@ -100,6 +404,10 @@ function subtractIntervals(rangeLeft: number, rangeRight: number, intervals: Arr
   return slots
 }
 
+function lineOverlaps(box: RectBox, lineTop: number): boolean {
+  return lineTop + LINE_HEIGHT > box.y && lineTop < box.y + box.height
+}
+
 function ribbonLocalBounds(t: number, width: number): { left: number, right: number } {
   const center =
     width * 0.5 +
@@ -116,8 +424,8 @@ function ribbonLocalBounds(t: number, width: number): { left: number, right: num
   }
 }
 
-function ribbonInterval(metrics: StageMetrics, lineTop: number): { left: number, right: number } | null {
-  const { ribbonBox } = metrics
+function ribbonInterval(layout: LayoutMetrics, lineTop: number): { left: number, right: number } | null {
+  const { ribbonBox } = layout
   const lineMid = lineTop + LINE_HEIGHT / 2
   if (lineMid < ribbonBox.y || lineMid > ribbonBox.y + ribbonBox.height) return null
   const t = clamp((lineMid - ribbonBox.y) / ribbonBox.height, 0, 1)
@@ -128,8 +436,8 @@ function ribbonInterval(metrics: StageMetrics, lineTop: number): { left: number,
   }
 }
 
-function blobInterval(metrics: StageMetrics, lineTop: number): { left: number, right: number } | null {
-  const { blobBox } = metrics
+function blobInterval(layout: LayoutMetrics, lineTop: number): { left: number, right: number } | null {
+  const { blobBox } = layout
   const lineMid = lineTop + LINE_HEIGHT / 2
   const cy = blobBox.y + blobBox.height * 0.52
   const dy = (lineMid - cy) / (blobBox.height * 0.52)
@@ -227,7 +535,7 @@ function buildBlobSvg(width: number, height: number): string {
   }
 
   const loops = [0.78, 0.6, 0.44]
-    .map(scale => {
+    .map((scale) => {
       const points: string[] = []
       for (let i = 0; i <= steps; i++) {
         const angle = (i / steps) * Math.PI * 2
@@ -257,109 +565,15 @@ function buildBlobSvg(width: number, height: number): string {
   `
 }
 
-function buildMetrics(width: number): StageMetrics {
-  const narrow = width < 920
-  const bodyLeft = narrow ? 24 : 74
-  const bodyRight = narrow ? width - 24 : width - 72
-  const ribbonBox = narrow
-    ? { x: width * 0.14, y: 300, width: width * 0.72, height: 280 }
-    : { x: width * 0.43, y: 22, width: Math.min(430, width * 0.39), height: 690 }
-
-  const blobBox = narrow
-    ? { x: width * 0.16, y: 650, width: width * 0.54, height: 130 }
-    : { x: 54, y: 500, width: 300, height: 196 }
-
-  const titleWidth = narrow ? width - 48 : Math.min(620, width * 0.47)
-  const titleHeight = setBox(titleBlock, { x: bodyLeft, y: narrow ? 54 : 74, width: titleWidth, height: 0 }).height
-
-  const centerTop = narrow ? titleBlock.offsetTop + titleHeight + 26 : 118
-  const centerHeight = setBox(deckCenter, {
-    x: narrow ? bodyLeft : width * 0.54,
-    y: centerTop,
-    width: narrow ? width - 48 : Math.min(280, width * 0.24),
-    height: 0,
-  }).height
-
-  const rightTop = narrow ? centerTop + centerHeight + 18 : 118
-  const rightHeight = setBox(deckRight, {
-    x: narrow ? bodyLeft : width - 242,
-    y: rightTop,
-    width: narrow ? width - 48 : 178,
-    height: 0,
-  }).height
-
-  const leftTop = narrow ? ribbonBox.y + ribbonBox.height + 28 : 332
-  const leftHeight = setBox(deckLeft, {
-    x: bodyLeft,
-    y: leftTop,
-    width: narrow ? width - 48 : 272,
-    height: 0,
-  }).height
-
-  const bottomTop = narrow ? blobBox.y + blobBox.height + 28 : 682
-  const bottomHeight = setBox(deckBottom, {
-    x: narrow ? bodyLeft : width * 0.55,
-    y: bottomTop,
-    width: narrow ? width - 48 : 310,
-    height: 0,
-  }).height
-
-  ribbonArt.style.left = `${ribbonBox.x}px`
-  ribbonArt.style.top = `${ribbonBox.y}px`
-  ribbonArt.style.width = `${ribbonBox.width}px`
-  ribbonArt.style.height = `${ribbonBox.height}px`
-  ribbonArt.innerHTML = buildRibbonSvg(ribbonBox.width, ribbonBox.height)
-
-  blobArt.style.left = `${blobBox.x}px`
-  blobArt.style.top = `${blobBox.y}px`
-  blobArt.style.width = `${blobBox.width}px`
-  blobArt.style.height = `${blobBox.height}px`
-  blobArt.innerHTML = buildBlobSvg(blobBox.width, blobBox.height)
-
-  return {
-    width,
-    stageTop: narrow ? bottomTop + bottomHeight + 34 : 104,
-    bodyLeft,
-    bodyRight,
-    ribbonBox,
-    blobBox,
-    titleBox: { x: bodyLeft, y: narrow ? 54 : 74, width: titleWidth, height: titleHeight },
-    centerBox: {
-      x: narrow ? bodyLeft : width * 0.54,
-      y: centerTop,
-      width: narrow ? width - 48 : Math.min(280, width * 0.24),
-      height: centerHeight,
-    },
-    rightBox: {
-      x: narrow ? bodyLeft : width - 242,
-      y: rightTop,
-      width: narrow ? width - 48 : 178,
-      height: rightHeight,
-    },
-    leftBox: {
-      x: bodyLeft,
-      y: leftTop,
-      width: narrow ? width - 48 : 272,
-      height: leftHeight,
-    },
-    bottomBox: {
-      x: narrow ? bodyLeft : width * 0.55,
-      y: bottomTop,
-      width: narrow ? width - 48 : 310,
-      height: bottomHeight,
-    },
-  }
-}
-
-function getSlots(metrics: StageMetrics, lineTop: number): Array<{ x: number, width: number }> {
-  if (metrics.width < 920) {
-    return [{ x: metrics.bodyLeft, width: metrics.bodyRight - metrics.bodyLeft }]
+function getSlots(layout: LayoutMetrics, lineTop: number): Array<{ x: number, width: number }> {
+  if (!layout.wide) {
+    return [{ x: layout.bodyLeft, width: layout.bodyRight - layout.bodyLeft }]
   }
 
   const intervals: Array<{ left: number, right: number }> = []
   const obstacleGap = 18
 
-  for (const box of [metrics.titleBox, metrics.centerBox, metrics.rightBox, metrics.leftBox, metrics.bottomBox]) {
+  for (const box of [layout.titleBox, layout.centerBox, layout.rightBox, layout.leftBox, layout.bottomBox, layout.footerBox]) {
     if (lineOverlaps(box, lineTop)) {
       intervals.push({
         left: box.x - obstacleGap,
@@ -368,31 +582,27 @@ function getSlots(metrics: StageMetrics, lineTop: number): Array<{ x: number, wi
     }
   }
 
-  const ribbon = ribbonInterval(metrics, lineTop)
+  const ribbon = ribbonInterval(layout, lineTop)
   if (ribbon !== null) intervals.push(ribbon)
 
-  const blob = blobInterval(metrics, lineTop)
+  const blob = blobInterval(layout, lineTop)
   if (blob !== null) intervals.push(blob)
 
-  return subtractIntervals(metrics.bodyLeft, metrics.bodyRight, intervals)
-    .map(slot => ({ x: slot.left, width: slot.right - slot.left }))
-    .filter(slot => slot.width >= 150)
+  return subtractIntervals(layout.bodyLeft, layout.bodyRight, intervals)
+    .map((slot) => ({ x: slot.left, width: slot.right - slot.left }))
+    .filter((slot) => slot.width >= 146)
 }
 
-function render(): void {
-  const metrics = buildMetrics(spread.clientWidth)
-  lineStage.replaceChildren()
-  lineElements = []
-
+function buildLines(layout: LayoutMetrics): { lines: PositionedLine[], contentBottom: number } {
+  const lines: PositionedLine[] = []
   let cursor: LayoutCursor = { segmentIndex: 0, graphemeIndex: 0 }
   let rowIndex = 0
-  let lineCount = 0
-  let lastTop = metrics.stageTop
-  const maxRows = 140
+  let lastTop = layout.stageTop
+  const maxRows = 220
 
   while (rowIndex < maxRows) {
-    const lineTop = metrics.stageTop + rowIndex * LINE_HEIGHT
-    const slots = getSlots(metrics, lineTop)
+    const lineTop = layout.stageTop + rowIndex * LINE_HEIGHT
+    const slots = getSlots(layout, lineTop)
 
     if (slots.length === 0) {
       rowIndex++
@@ -402,47 +612,119 @@ function render(): void {
     for (const slot of slots) {
       const line = layoutNextLine(prepared, cursor, slot.width)
       if (line === null) {
-        const minimumHeight = Math.max(
-          metrics.bottomBox.y + metrics.bottomBox.height + 120,
-          lastTop + LINE_HEIGHT + 120,
-          metrics.ribbonBox.y + metrics.ribbonBox.height + 90,
+        const contentBottom = Math.max(
+          layout.footerBox.y + layout.footerBox.height,
+          layout.ribbonBox.y + layout.ribbonBox.height + 44,
+          layout.blobBox.y + layout.blobBox.height + 32,
+          lastTop + LINE_HEIGHT,
         )
-        spread.style.minHeight = `${Math.ceil(minimumHeight)}px`
-        statusMeta.textContent = `${lineCount} positioned lines • ${metrics.width}px spread • resize to recompose`
-        return
+        return { lines, contentBottom }
       }
 
-      const el = document.createElement('div')
-      const currentLineNumber = lineCount + 1
-      el.className = 'line'
-      el.textContent = line.text
-      el.style.left = `${slot.x}px`
-      el.style.top = `${lineTop}px`
-      el.title =
-        `L${currentLineNumber} • ${line.start.segmentIndex}:${line.start.graphemeIndex}→` +
-        `${line.end.segmentIndex}:${line.end.graphemeIndex}` +
-        (line.trailingDiscretionaryHyphen ? ' • discretionary hyphen' : '')
-      el.addEventListener('mouseenter', () => {
-        statusMeta.textContent =
-          `L${currentLineNumber} • ${line.start.segmentIndex}:${line.start.graphemeIndex}→` +
-          `${line.end.segmentIndex}:${line.end.graphemeIndex} • ${line.width.toFixed(2)}px`
+      const lineNumber = lines.length + 1
+      lines.push({
+        left: slot.x,
+        top: lineTop,
+        text: line.text,
+        title:
+          `L${lineNumber} • ${line.start.segmentIndex}:${line.start.graphemeIndex}→` +
+          `${line.end.segmentIndex}:${line.end.graphemeIndex}` +
+          (line.trailingDiscretionaryHyphen ? ' • discretionary hyphen' : '') +
+          ` • ${line.width.toFixed(2)}px`,
       })
-      lineStage.appendChild(el)
-      lineElements.push(el)
-
       cursor = line.end
-      lineCount++
       lastTop = lineTop
     }
 
     rowIndex++
   }
 
-  spread.style.minHeight = `${Math.ceil(lastTop + LINE_HEIGHT + 120)}px`
-  statusMeta.textContent = `${lineCount} positioned lines • ${metrics.width}px spread • max rows reached`
+  return {
+    lines,
+    contentBottom: Math.max(
+      layout.footerBox.y + layout.footerBox.height,
+      lastTop + LINE_HEIGHT,
+      layout.ribbonBox.y + layout.ribbonBox.height + 44,
+      layout.blobBox.y + layout.blobBox.height + 32,
+    ),
+  }
 }
 
-const resizeObserver = new ResizeObserver(() => render())
-resizeObserver.observe(spread)
+function ensureLineNode(index: number): HTMLDivElement {
+  let node = domCache.lineNodes[index]
+  if (node === undefined) {
+    node = document.createElement('div')
+    node.className = 'line'
+    domCache.lineNodes[index] = node
+    domCache.lineStage.appendChild(node)
+  }
+  return node
+}
 
-render()
+function applySceneProjection(layout: LayoutMetrics, lines: PositionedLine[]): void {
+  domCache.poster.style.height = `${layout.height}px`
+
+  setRect(domCache.issueTag, layout.issueBox)
+  setRect(domCache.titleBlock, layout.titleBox)
+  setRect(domCache.deckCenter, layout.centerBox)
+  setRect(domCache.deckRight, layout.rightBox)
+  setRect(domCache.deckLeft, layout.leftBox)
+  setRect(domCache.deckBottom, layout.bottomBox)
+  setRect(domCache.footerNote, layout.footerBox)
+  setRect(domCache.status, layout.statusBox)
+
+  setRect(domCache.ribbonArt, layout.ribbonBox)
+  domCache.ribbonArt.style.height = `${layout.ribbonBox.height}px`
+  domCache.ribbonArt.innerHTML = buildRibbonSvg(layout.ribbonBox.width, layout.ribbonBox.height)
+
+  setRect(domCache.blobArt, layout.blobBox)
+  domCache.blobArt.style.height = `${layout.blobBox.height}px`
+  domCache.blobArt.innerHTML = buildBlobSvg(layout.blobBox.width, layout.blobBox.height)
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!
+    const node = ensureLineNode(i)
+    node.textContent = line.text
+    node.title = line.title
+    node.style.left = `${line.left}px`
+    node.style.top = `${line.top}px`
+  }
+
+  for (let i = lines.length; i < domCache.lineNodes.length; i++) {
+    domCache.lineNodes[i]!.remove()
+  }
+  domCache.lineNodes.length = lines.length
+
+  domCache.statusMeta.textContent =
+    `${lines.length} positioned lines • ${layout.width}px poster • explicit resize pass`
+}
+
+function render(): void {
+  const viewportWidth = document.documentElement.clientWidth
+  const viewportHeight = document.documentElement.clientHeight
+
+  const base = computeBaseLayout(viewportWidth, viewportHeight)
+  applyMeasureProjection(base)
+  const measured = readHeights()
+  const layout = computeLayout(base, measured)
+  const { lines, contentBottom } = buildLines(layout)
+
+  const height = Math.max(
+    viewportHeight - 32,
+    contentBottom + measured.status + 74,
+    layout.blobBox.y + layout.blobBox.height + measured.status + 90,
+  )
+
+  applySceneProjection({
+    ...layout,
+    height,
+    statusBox: {
+      x: layout.statusBox.x,
+      y: height - measured.status - 24,
+      width: layout.statusBox.width,
+      height: measured.status,
+    },
+  }, lines)
+}
+
+scheduleRender()
