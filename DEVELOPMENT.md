@@ -13,13 +13,12 @@ bun run corpus-font-matrix --id=ar-risalat-al-ghufran-part-1 --samples=5  # samp
 ```
 
 Pages:
-- `/demo.html` — manual line-placement demo streamed from repeated `layoutNextLine()` calls
-- `/dynamic-layout.html` — fixed-height editorial spread with a continuous two-column flow, obstacle-aware title routing, and live logo-driven reflow
-- `/accuracy.html` — sweep across fonts, sizes, widths, i18n texts
-- `/benchmark.html` — performance comparison
-- `/bubbles.html` — bubble shrinkwrap demo
-- `/emoji-test.html` — canvas vs DOM emoji width sweep
-- `/corpus.html` — long-form corpora + diagnostics (`font=` / `lineHeight=` query params supported)
+- `/demos/dynamic-layout` — fixed-height editorial spread with two-column flow, obstacle avoidance, live logo-driven reflow
+- `/demos/bubbles` — bubble shrinkwrap demo
+- `/accuracy` — sweep across fonts, sizes, widths, i18n texts
+- `/benchmark` — performance comparison
+- `/emoji-test` — canvas vs DOM emoji width sweep
+- `/corpus` — long-form corpora + diagnostics (`font=` / `lineHeight=` query params supported)
 
 ## Research
 

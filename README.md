@@ -74,7 +74,7 @@ while (true) {
 }
 ```
 
-This usage allows rendering to canvas, SVG, WebGL and (eventually) server-side. See the [Dynamic Layout](/pages/dynamic-layout.html) demo for a richer example.
+This usage allows rendering to canvas, SVG, WebGL and (eventually) server-side. See the [Dynamic Layout](/demos/dynamic-layout) demo for a richer example.
 
 ### API Glossary
 

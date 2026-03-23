@@ -14,9 +14,8 @@ What is already done:
 - `setLocale(locale?)` exists and resets the shared analysis state for future `prepare()` calls.
 - `layoutWithLines()` now exposes boundary cursors and `trailingDiscretionaryHyphen`.
 - `layoutNextLine()` now exists on the rich path for variable-width, per-row userland layout.
-- `pages/demo.html` / `pages/demo.ts` are now a real manual line-layout demo instead of a placeholder.
-- `pages/dynamic-layout.html` / `pages/dynamic-layout.ts` are now the main rich editorial demo: fixed-height spread, continuous two-column flow, obstacle-aware title routing, live logo-driven reflow, and line-level hover tooling.
-- `pages/bubbles.html` / `pages/bubbles.ts` keep the shrinkwrap / `walkLineRanges()` story honest.
+- `pages/demos/dynamic-layout.html` / `pages/demos/dynamic-layout.ts` are now the main rich editorial demo: fixed-height spread, continuous two-column flow, obstacle-aware title routing, live logo-driven reflow, and line-level hover tooling.
+- `pages/demos/bubbles.html` / `pages/demos/bubbles.ts` keep the shrinkwrap / `walkLineRanges()` story honest.
 - Japanese now has two canaries (`ja-rashomon`, `ja-kumo-no-ito`).
 - Chinese now has a real long-form canary (`zh-zhufu`) with an actual font split (`Songti SC` vs `PingFang SC`).
 - Chinese now also has a second canary (`zh-guxiang`) showing the same Chrome-positive / Safari-clean split by a different acquisition path.

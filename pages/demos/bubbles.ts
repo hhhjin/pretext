@@ -1,4 +1,4 @@
-import { prepareWithSegments, walkLineRanges, type PreparedTextWithSegments } from '../src/layout.ts'
+import { prepareWithSegments, walkLineRanges, type PreparedTextWithSegments } from '../../src/layout.ts'
 
 function layoutShrinkwrap(prepared: PreparedTextWithSegments, maxWidth: number, lineHeight: number): { lineCount: number, height: number, maxLineWidth: number } {
   let maxLineWidth = 0

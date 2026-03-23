@@ -30,11 +30,9 @@ Internal notes for contributors and agents. Use `README.md` as the public source
 - `src/layout.test.ts` — small durable invariant tests for the exported prepare/layout APIs
 - `pages/accuracy.ts` — browser sweep plus per-line diagnostics
 - `pages/benchmark.ts` — performance comparisons
-- `pages/bubbles.ts` — bubble shrinkwrap demo using the rich non-materializing line-range walker
-- `pages/demo.ts` — manual line-placement demo built from repeated `layoutNextLine()` calls
-- `pages/dynamic-layout.ts` — fixed-height editorial spread with a continuous two-column flow, obstacle-aware title routing, and live logo-driven reflow
 - `pages/diagnostic-utils.ts` — shared grapheme-safe diagnostic helpers used by the browser check pages
-- `pages/line-utils.ts` — browser-demo helper that collects whole line arrays via repeated `layoutNextLine()` calls
+- `pages/demos/bubbles.ts` — bubble shrinkwrap demo using the rich non-materializing line-range walker
+- `pages/demos/dynamic-layout.ts` — fixed-height editorial spread with a continuous two-column flow, obstacle-aware title routing, and live logo-driven reflow
 
 ### Implementation notes
 
